@@ -1,0 +1,5 @@
+# Dev profile. Activates the local token endpoint at GET /dev/token and verbose logging.
+# Run with: SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
+logging:
+  level:
+    com.clinicalai.gateway: DEBUG

@@ -1,0 +1,24 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+.idea/
+*.iml
+*.log
+.DS_Store
+.env
+
+# Frontend (web/)
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.env.local
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Helm
+*.tgz

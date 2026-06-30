@@ -1,0 +1,44 @@
+# Helm values for the local minikube demo. Overrides the production-leaning defaults in the chart.
+#
+#   helm upgrade --install gw helm/clinical-ai-gateway \
+#     --namespace clinical-ai -f deploy/local/values-local.yaml
+#
+# The image is built locally and loaded into the cluster, so the tag is fixed and the pull policy
+# never reaches out to a registry.
+replicaCount: 1
+
+# A local-only image name (not a public Docker Hub repository), built and loaded into the cluster by
+# deploy/local/up.sh. Using a name that does not exist on Docker Hub means IfNotPresent can never
+# silently pull a different image of the same name from a registry.
+image:
+  repository: clinical-ai-gateway
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# Lower footprint so the app, Postgres, Redis, and Kafka all fit on a single-node minikube.
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
+
+config:
+  # The dev profile activates the local token endpoint at /dev/token so the deployed API can be
+  # exercised inside the cluster without an external identity provider.
+  springProfilesActive: dev
+  modelProvider: mock
+  usageMode: monitor
+  usageRpm: "600"
+  reviewRequiredAssistants: ""
+  dbUrl: jdbc:postgresql://postgres:5432/clinicalai
+  redisHost: redis
+  redisPort: "6379"
+  kafkaBootstrap: kafka:9092
+  auditTopic: clinical-ai.audit
+
+secret:
+  dbUser: clinicalai
+  # Matches the Postgres password in deploy/local/10-postgres.yaml. Local demo only.
+  dbPassword: clinicalai

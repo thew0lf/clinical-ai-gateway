@@ -1,0 +1,6 @@
+apiVersion: v2
+name: clinical-ai-gateway
+description: Clinical AI Control Plane, a governance gateway for clinical AI assistants.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,43 @@
+replicaCount: 2
+
+image:
+  repository: clinical-ai-gateway
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# Non secret configuration, rendered into a ConfigMap.
+config:
+  springProfilesActive: ""
+  modelProvider: mock
+  usageMode: monitor
+  usageRpm: "600"
+  # Empty means full autonomy. Set a risk based list such as "CLINICAL,BILLING" to require review.
+  reviewRequiredAssistants: ""
+  dbUrl: jdbc:postgresql://postgres:5432/clinicalai
+  redisHost: redis
+  redisPort: "6379"
+  kafkaBootstrap: kafka:9092
+  auditTopic: clinical-ai.audit
+
+# Demo secret values. In a real cluster these come from an external secret manager,
+# for example AWS Secrets Manager via the External Secrets Operator.
+secret:
+  dbUser: clinicalai
+  dbPassword: changeme

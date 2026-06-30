@@ -1,0 +1,71 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+    id 'com.diffplug.spotless' version '6.25.0'
+}
+
+group = 'com.clinicalai'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Web and API
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+
+    // Security (OAuth2 resource server)
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
+    // Persistence
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // Redis (usage metering)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // Kafka (audit event publishing)
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // Observability
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:kafka'
+    testImplementation 'org.awaitility:awaitility'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+spotless {
+    // Lint runs as an explicit CI gate (spotlessCheck), not as part of the default build,
+    // so a fresh clone builds green. Run "./gradlew spotlessApply" before committing.
+    enforceCheck false
+    java {
+        googleJavaFormat('1.22.0')
+        target 'src/**/*.java'
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}

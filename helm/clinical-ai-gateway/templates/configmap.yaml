@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "clinical-ai-gateway.fullname" . }}-config
+  labels:
+    {{- include "clinical-ai-gateway.labels" . | nindent 4 }}
+data:
+  DB_URL: {{ .Values.config.dbUrl | quote }}
+  REDIS_HOST: {{ .Values.config.redisHost | quote }}
+  REDIS_PORT: {{ .Values.config.redisPort | quote }}
+  KAFKA_BOOTSTRAP: {{ .Values.config.kafkaBootstrap | quote }}
+  AUDIT_TOPIC: {{ .Values.config.auditTopic | quote }}
+  USAGE_MODE: {{ .Values.config.usageMode | quote }}
+  USAGE_RPM: {{ .Values.config.usageRpm | quote }}
+  REVIEW_REQUIRED_ASSISTANTS: {{ .Values.config.reviewRequiredAssistants | quote }}
+  MODEL_PROVIDER: {{ .Values.config.modelProvider | quote }}
+  SPRING_PROFILES_ACTIVE: {{ .Values.config.springProfilesActive | quote }}
