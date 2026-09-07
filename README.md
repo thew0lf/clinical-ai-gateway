@@ -1,14 +1,34 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+  <img src="docs/assets/logo.svg" alt="Clinical AI Control Plane" width="110">
+</picture>
+
 # Clinical AI Control Plane
 
-A governance gateway that sits between clinical AI assistants and the model layer. It provides the
-cross cutting capabilities that an assistant fleet needs in a healthcare setting: protection of
-protected health information, per tenant cost and usage observability, configurable human review,
-provenance for every output, and a complete audit trail.
+**A governance gateway between clinical AI assistants and the model layer.**
 
-The control plane is built to enable AI rather than to restrict it. The default posture is autonomy
-with observability. Human review and hard budgets are policies that an operator can turn on where the
-risk justifies them, not fixed gates applied to every request. The model call itself is thin and sits
-behind a vendor neutral provider seam. The engineering value is in the governance plane around it.
+PHI redaction · per tenant cost observability · policy driven human review · provenance · full audit trail
+
+[![CI](https://github.com/thew0lf/clinical-ai-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/thew0lf/clinical-ai-gateway/actions/workflows/ci.yml)
+![Java](https://img.shields.io/badge/Java-21-437291?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white)
+![Apache Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apachekafka&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white)
+![Helm](https://img.shields.io/badge/Helm-0F1689?logo=helm&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-844FBA?logo=terraform&logoColor=white)
+
+[Quick start](#quick-start) · [Architecture](#architecture) · [Technologies](#technologies) · [Documentation](#documentation)
+
+</div>
+
+---
+
+The control plane sits between a fleet of clinical AI assistants (billing, clinical, front office, patient, support) and the model layer, and provides the cross cutting capabilities the fleet needs in a healthcare setting. It is built to **enable AI rather than to restrict it**: the default posture is autonomy with observability. Human review and hard budgets are policies an operator turns on where risk justifies them, not fixed gates applied to every request. The model call itself is thin and sits behind a vendor neutral provider seam; the engineering value is in the governance plane around it.
 
 ## Architecture
 
@@ -30,131 +50,72 @@ flowchart LR
   AC --> AS[(Postgres: audit read model)]
 ```
 
-## The governed flow
+Every request passes through the same governed pipeline in the same order:
 
-1. An assistant calls the gateway with a JWT carrying a tenant id and scopes.
-2. The gateway meters the request and token usage per tenant for cost observability. It does not
-   block by default.
-3. Direct identifiers are redacted from the input before any model call.
-4. The model is called through the provider seam. The mock provider is the default.
-5. The suggestion is persisted with its provenance.
-6. The review policy decides the next state. With autonomy, the default, the suggestion is auto
-   approved. Where policy requires review, it stays PENDING for an authorized reviewer.
-7. Every transition, automated or human, is published to Kafka and persisted by a separate consumer.
+1. **Authenticate**: the JWT carries a tenant id and scopes; tenant isolation is applied at every query.
+2. **Meter**: request and token usage is recorded per tenant for cost observability. It does not block by default.
+3. **Redact**: direct identifiers are removed before any model call. Always on.
+4. **Generate**: the model is called through the provider seam; the mock provider is the default.
+5. **Persist**: the suggestion is stored with its grounding references and provenance.
+6. **Decide**: the review policy auto approves by default, or holds the suggestion PENDING for a reviewer where policy requires it.
+7. **Audit**: every transition, automated or human, is published to Kafka and persisted by a separate consumer.
 
-## Stack
+Full detail with diagrams is in the [architecture portfolio](docs/pdf/Clinical-AI-Architecture-Portfolio.pdf).
 
-Java 21, Spring Boot 3.3, Spring Web, Spring Security as an OAuth2 resource server, Spring Data JPA
-with PostgreSQL and Flyway, Spring Data Redis, Spring Kafka, springdoc OpenAPI, JUnit 5, Mockito, and
-Testcontainers. Build with Gradle. Container with Docker. Deploy with Helm to EKS provisioned by
-Terraform.
+## Quick start
 
-## Run it locally
-
-Prerequisites: Java 21, Docker, and Docker Compose.
-
-Start the infrastructure (Postgres, Redis, single node Kafka):
-
-```
-docker compose up -d
-```
-
-Run the application with the dev profile, which enables a local token endpoint:
-
-```
-SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
-```
-
-Mint a development token:
-
-```
+```bash
+docker compose up -d                            # Postgres, Redis, single node Kafka
+SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun    # run with the dev token endpoint enabled
 TOKEN=$(curl -s "http://localhost:8080/dev/token" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
-```
-
-Create a suggestion:
-
-```
 curl -s -X POST http://localhost:8080/api/v1/suggestions \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "encounterId": "enc-1001",
-        "assistantType": "BILLING",
-        "inputText": "Patient SSN 123-45-6789 seen for acne follow up.",
-        "groundingReferences": [
-          {"sourceType": "ENCOUNTER", "sourceId": "enc-1001", "description": "visit note"}
-        ]
-      }'
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"encounterId":"enc-1001","assistantType":"BILLING",
+       "inputText":"Patient SSN 123-45-6789 seen for acne follow up.",
+       "groundingReferences":[{"sourceType":"ENCOUNTER","sourceId":"enc-1001","description":"visit note"}]}'
 ```
 
-With the default configuration the suggestion is auto approved, since no assistant requires review.
-The response shows an APPROVED status and a decidedBy of policy:auto.
+The suggestion comes back auto approved by `policy:auto`, with the SSN redacted before the model ever saw it. API docs are at `http://localhost:8080/swagger-ui.html` once running.
 
-To see the human review path, start the application with review required for an assistant type:
+The whole stack also runs on a local Kubernetes cluster with one command (`deploy/local/up.sh`), using the same Helm chart that targets EKS. See the [getting started guide](docs/getting-started.md) for the full walkthrough, the human review path, Kubernetes instructions, and tests. Configuration knobs and the security model are in [configuration and security](docs/configuration.md).
 
-```
-REVIEW_REQUIRED_ASSISTANTS=BILLING SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
-```
+## Technologies
 
-Now a BILLING suggestion is created in PENDING state and can be approved:
-
-```
-curl -s -X POST http://localhost:8080/api/v1/suggestions/<id>/approve \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Read the API documentation at `http://localhost:8080/swagger-ui.html`.
-
-## Run on Kubernetes (local)
-
-The whole control plane, including its Postgres, Redis, and Kafka dependencies, runs on a local
-single-node Kubernetes cluster ([minikube](https://minikube.sigs.k8s.io/)). This is the cloud-native
-runnable proof of the system without provisioning any cloud resources. It uses the same Helm chart
-under `helm/clinical-ai-gateway` that targets EKS in production.
-
-```
-deploy/local/up.sh
-```
-
-The script builds the application image as `clinical-ai-gateway:0.1.0`, starts minikube, loads the image,
-deploys the dependencies, and installs the gateway via Helm. Every command is pinned to the
-`minikube` context, so it cannot touch a remote cluster. Full instructions, including how to exercise
-the API once it is up, are in [`deploy/local/README.md`](deploy/local/README.md). Tear down with
-`deploy/local/down.sh`.
-
-## Configuration
-
-| Variable | Default | Purpose |
+| Layer | Technology | Role |
 | --- | --- | --- |
-| `MODEL_PROVIDER` | `mock` | Model backend. `mock` for local and tests, `remote` for a real backend. |
-| `USAGE_MODE` | `monitor` | `monitor` records usage without blocking. `enforce` applies a hard budget. |
-| `USAGE_RPM` | `600` | Per tenant request budget used for the soft warning and for enforce mode. |
-| `REVIEW_REQUIRED_ASSISTANTS` | empty | Comma separated assistant types that require human review. Empty means autonomy. |
+| Language and runtime | Java 21, Spring Boot 3.3, Gradle | Application platform |
+| API | Spring Web, springdoc OpenAPI | Versioned REST contract at `/api/v1`, live docs at `/swagger-ui.html` |
+| Security | Spring Security OAuth2 resource server | Stateless JWT verification, tenant claim, scope gated operations |
+| Persistence | PostgreSQL, Spring Data JPA, Flyway | Suggestions, audit read model; schema by migration only |
+| Metering | Redis, Spring Data Redis | Per tenant request and token counters, soft budgets |
+| Audit stream | Apache Kafka, Spring Kafka | Durable audit topic with an independent consumer |
+| Testing | JUnit 5, Mockito, Testcontainers, Awaitility | Unit and full stack integration tests, no cloud dependency |
+| Quality | Spotless (google-java-format), Trivy | Formatting gate and vulnerability, secret, misconfig scanning in CI |
+| Packaging | Docker | Multi stage image build |
+| Orchestration | Kubernetes, Helm | One chart for the local minikube proof and the EKS target |
+| Infrastructure | Terraform, AWS EKS | VPC and cluster as code |
 
-## Tests
+## Documentation
 
-```
-./gradlew test
-```
+### Document set (PDF)
 
-The unit tests cover redaction, usage metering in both monitor and enforce modes, and the
-orchestration logic including the autonomous and review required paths. The integration test starts
-Postgres, Kafka, and Redis with Testcontainers, drives the create and approve flow over HTTP with a
-signed token, and waits for the audit consumer to persist the trail. Running the tests requires a
-Docker daemon.
+Formal architecture documentation, generated from a single source and versioned with the code.
 
-## Formatting
+| Document | Contents |
+| --- | --- |
+| [Architecture Portfolio](docs/pdf/Clinical-AI-Architecture-Portfolio.pdf) | All five documents combined, with cover and table of contents |
+| [CAG-01 Technical Architecture](docs/pdf/CAG-01-Technical-Architecture.pdf) | Layered design, the governed pipeline, state machine, security, API, deployment |
+| [CAG-02 Architecture Diagrams](docs/pdf/CAG-02-Architecture-Diagrams.pdf) | System context, governed request flow, state machine, deployment topology |
+| [CAG-03 Architecture Decision Records](docs/pdf/CAG-03-Architecture-Decision-Records.pdf) | Context, decision, and consequences for every load bearing choice |
+| [CAG-04 Enterprise Standard](docs/pdf/CAG-04-Enterprise-Standard.pdf) | The layered contract, security posture, code quality bar, anti-pattern table |
+| [CAG-05 Model and Redaction Research](docs/pdf/CAG-05-Model-and-Redaction-Research.pdf) | Model backend options, PHI de-identification options, hallucination posture |
 
-Formatting is checked by Spotless as a separate continuous integration job, so a fresh clone builds
-green. Apply formatting before committing:
+### Guides
 
-```
-./gradlew spotlessApply
-```
+- [Getting started](docs/getting-started.md): run it locally, exercise both governance paths, run on Kubernetes, run the tests
+- [Configuration and security](docs/configuration.md): every knob, the auth model, the CI pipeline
 
-## Design decisions
-
-The reasoning behind the architecture is recorded as architecture decision records:
+### Design decisions (ADR)
 
 - [ADR 0001: Centralized AI control plane](docs/adr/0001-centralized-ai-control-plane.md)
 - [ADR 0002: Policy driven human review](docs/adr/0002-human-in-the-loop-approval-gate.md)
@@ -163,29 +124,12 @@ The reasoning behind the architecture is recorded as architecture decision recor
 - [ADR 0005: Vendor neutral model provider seam](docs/adr/0005-model-provider-abstraction.md)
 - [ADR 0006: Usage metering and soft budgets, not hard rate limits](docs/adr/0006-usage-metering-not-hard-limits.md)
 
-## Architecture process and planning
+### Process and planning
 
-How an initiative moves from business strategy to a running system, with the artifacts produced at
-each step:
-
-- [Architecture process](docs/architecture/process.md): the phases from discovery to a hardened,
-  scaled system, and why a mockup precedes the prototype.
-- [Reviewer Console wireframes and API contract](docs/design/wireframes.md): the low-fidelity
-  mockup that aligns stakeholders before any UI is built.
-- [Delivery plan and backlog](docs/planning/backlog.md): the initiative decomposed into epics and
-  vertically sliced tickets with acceptance criteria.
-
-## Security note
-
-The RSA key pair under `src/main/resources/keys` is a throwaway key used only to sign and verify
-local development and test tokens. It must never be used outside local development. In a real
-deployment the resource server validates tokens from a real identity provider, and secrets come from
-a managed secret store.
+- [Architecture process](docs/architecture/process.md): the phases from discovery to a hardened, scaled system, and why a mockup precedes the prototype
+- [Reviewer Console wireframes and API contract](docs/design/wireframes.md): the low fidelity mockup that aligns stakeholders before any UI is built
+- [Delivery plan and backlog](docs/planning/backlog.md): the initiative decomposed into epics and vertically sliced tickets with acceptance criteria
 
 ## Scope
 
-This is a focused reference implementation. The model call is mocked by default, the redaction is
-pattern based and illustrative, and the remote provider is a stub that marks where a real model
-client belongs. PHI redaction and the audit trail are always on, since they are data protection and
-compliance concerns rather than limits on what the AI can do. These boundaries are intentional and
-are documented where they occur.
+This is a focused reference implementation. The model call is mocked by default, the redaction is pattern based and illustrative, and the remote provider is a stub that marks where a real model client belongs. PHI redaction and the audit trail are always on, since they are data protection and compliance concerns rather than limits on what the AI can do. These boundaries are intentional and are documented where they occur.
