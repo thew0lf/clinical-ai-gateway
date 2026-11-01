@@ -133,3 +133,7 @@ Formal architecture documentation, generated from a single source and versioned 
 ## Scope
 
 This is a focused reference implementation. The model call is mocked by default, the redaction is pattern based and illustrative, and the remote provider is a stub that marks where a real model client belongs. PHI redaction and the audit trail are always on, since they are data protection and compliance concerns rather than limits on what the AI can do. These boundaries are intentional and are documented where they occur.
+
+## Author
+
+Designed and built by **Guillermo (Bill) Cuevas**, Principal Software & Platform Architect. [LinkedIn](https://www.linkedin.com/in/guillermo-bill-cuevas/)
